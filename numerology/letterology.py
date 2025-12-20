@@ -1,8 +1,9 @@
-
+from numerology import numerology
 
 class letterology(): 
     def __init__(self):
-        
+        self.numbers = numerology()
+
         self.full_letters = {"a" : 1, "b" : 2, "c" : 3, "d" : 4, "e" : 5, "f" : 6, "g" : 7, "h" : 8, "i" : 9, 
                             "j" : 10, "k" : 11, "l" : 12, "m" : 13, "n" : 14, "o" : 15, "p" : 16, "q" : 17, "r" : 18, 
                             "s" : 19, "t" : 20, "u" : 21, "v" : 22, "w" : 23, "x" : 24, "y" : 25, "z" : 26, "A" : 27,
@@ -15,9 +16,9 @@ class letterology():
                                 "s" : 1, "t" : 2, "u" : 3, "v" : 22, "w" : 5, "x" : 6, "y" : 7, "z" : 8, "A" : 9, 
                                 "B" : 1, "C" : 11, "D" : 3, "E" : 4, "F" : 5, "G" : 33, "H" : 7, "I" : 8, "J" : 9, 
                                 "K" : 1, "L" : 11, "M" : 3, "N" : 4, "O" : 5, "P" : 6, "Q" : 7, "R" : 8, "S" : 9, 
-                                "T" : 1, "U" : 11, "V" : 3, "W" : 4, "X" : 5, "Y" : 6, "Z" : 7,}
+                                "T" : 1, "U" : 11, "V" : 3, "W" : 4, "X" : 5, "Y" : 6, "Z" : 7}
 
-    def get_sum(self, word): 
+    def get_sum(self, word: str): 
         '''
         Convert Letters to Number
         word = Alphanumeric string
@@ -25,24 +26,58 @@ class letterology():
 
         word = [*word]
 
-        full_sum = 0
-        reduced_sum = 0
+        word_sum_full = 0
+        word_sum_reduced = 0
+        vowel_sum_full = 0
+        vowel_sum_reduced = 0
+
+        first_letter_full = 0
+        first_letter_reduced = 0
+        first_vowel_full = 0
+        first_vowel_reduced = 0
+
         for character in word:
             if character.isalpha():
-                full_sum += self.full_letters[character]
-                reduced_sum += self.reduced_letters[character]
+                word_sum_full += self.full_letters[character]
+                word_sum_reduced += self.reduced_letters[character]
+                if first_letter_full == 0:
+                    first_letter_full = word_sum_full
+                    first_letter_reduced = word_sum_reduced
 
             elif character.isnumeric():
-                full_sum += int(character)
-                reduced_sum += int(character)
+                word_sum_full += int(character)
+                word_sum_reduced += int(character)
 
-            else: 
-                # Character is neither letter or number. 
-                continue
-        
-        return {"Full": full_sum, "Reduced": reduced_sum}
+            if self.is_vowel(character):
+                vowel_sum_full += self.full_letters[character]
+                vowel_sum_reduced += self.reduced_letters[character]
+                if first_vowel_full == 0:
+                    first_vowel_full = vowel_sum_full
+                    first_vowel_reduced = vowel_sum_reduced
+
+        word_sum_full_reduced = self.numbers.reduce_number(word_sum_full)
+        word_sum_reduced_reduced = self.numbers.reduce_number(word_sum_reduced)
+        vowel_sum_full_reduced = self.numbers.reduce_number(vowel_sum_full)
+        vowel_sum_reduced_reduced = self.numbers.reduce_number(vowel_sum_reduced)
+
+        stats = {"Full Word": word_sum_full, "Full Word Reduced": word_sum_full_reduced, 
+                 "Reduced Word": word_sum_reduced, "Reduced Word Reduced": word_sum_reduced_reduced, 
+                 "Full Vowel": vowel_sum_full, "Full Vowel Reduced": vowel_sum_full_reduced, 
+                 "Reduced Vowel": vowel_sum_reduced, "Reduced Vowel Reduced": vowel_sum_reduced_reduced, 
+                 "First Letter Full": first_letter_full, "First Letter Reduced": first_letter_reduced, 
+                 "First Vowel Full": first_vowel_full, "First Vowel Reduced": first_vowel_reduced}
+
+        return stats
+
+    def is_vowel(self, c):
+        if (c == 'a' or c == 'e' or c == 'i' or 
+            c == 'o' or c == 'u' or c == 'A' or 
+            c == 'E' or c == 'I' or c == 'O' or c == 'U'):
+            return True
+        return False
 
 if __name__ == "__main__":
+    # print(letterology().get_sum("word"))
     while True:
         word = input("Enter word: ")
 

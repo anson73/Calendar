@@ -1,58 +1,118 @@
+import os
 import pandas as pd
+from PIL import Image, ImageDraw, ImageFont
+from typing import Dict
 
 from numerology import numerology
 
 class year_calendar:
-    def __init__(self): 
-        self.month_lengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    def calendar(self, year: int) -> pd.DataFrame:
+        txt_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"calendar-{year}.txt")
+        image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"calendar-{year}.png")
 
-    def generate_calendar(self, year): 
-        df = pd.DataFrame(columns=['month', 'daynumber', 'date', 'day'])
-        isleapyear = numerology().is_leap_year(year)
+        all_days = pd.date_range(start=f'{year}-01-01', end=f'{year}-12-31', freq='D').date
+        df = pd.DataFrame([numerology().get_info(d) for d in all_days])
+        lines = []
 
-        daycount = {1:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 11:0, 22:0, 33:0, 28:0}
+        df = df[df['year'] == year]
+        year_info = df.head(1).iloc[0]
+        lines.append(f"{year_info["year"]}->{year_info["year_reduced"]}\n")
 
-        # Reduce the Year
-        print(f"YEAR: {year} = {numerology().reduce(year)}")
+        dfs: Dict[int, pd.DataFrame] = {month: df[df['month'] == month]for month in range(1, 13)}
+        for month in range(1, 13):
+            df = dfs[month]
+            month_info = df.head(1).iloc[0]
+            lines.append(f"\n{month_info["month"]}->{month_info["reduced_month"]} | {month_info["lp_month_reduced"]}/{month_info["lp_month_full"]} -> {month_info["lp_month"]}\n")
 
-        month = 1
-        daynumber = 1
-        for days in self.month_lengths:
-            # Print months
-            month_reduced, month_V1, month_V2 = numerology().reduce_month(year, month)
-            if month_V1 == month_V2:
-                print(f"{month} : {month_reduced}, {month_V1}")
-            elif month_V1 > month_V2:
-                print(f"{month} : {month_reduced}, {month_V1}/{month_V2}")
-            elif month_V1 < month_V2:
-                print(f"{month} : {month_reduced}, {month_V2}/{month_V1}")
-            
-            # Check for leap year
-            updateddays = days
-            if month == 2 and isleapyear:
-                updateddays += 1
+            for index, day_info in df.iterrows():
+                lines.append(f"\t{day_info["day_of_year"]}: {day_info["date"]} | {day_info["day"]}->{day_info["reduced_day"]} | {day_info["lp_day_reduced"]}/{day_info["lp_day_full"]} -> {day_info["lp_day"]}\n")
 
-            # Print Days
-            day = 1
-            while day <= updateddays:
-                day_reduced, day_V1, day_V2 = numerology().reduce_day(year, month, day)
-                if day_V1 == day_V2:
-                    print(f"\t{daynumber}) {day}/{month}/{year} : {day_reduced}, {day_V1}")
-                    daycount[day_V1] += 1
-                elif day_V1 > day_V2:
-                    print(f"\t{daynumber}) {day}/{month}/{year} : {day_reduced}, {day_V1}/{day_V2}")
-                    daycount[day_V2] += 1
-                elif day_V1 < day_V2:
-                    print(f"\t{daynumber}) {day}/{month}/{year} : {day_reduced}, {day_V2}/{day_V1}")
-                    daycount[day_V1] += 1
+        text = "".join(lines)
 
-                day += 1
-                daynumber += 1
+        # Save calendar as txt
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(text)
 
-            month += 1
+        # Save calendar as png
+        image = self.calendar_image(text)
+        image.save(image_path, dpi=(300, 300), quality=100)
 
+    def calendar_image(self, text: str) -> Image.Image: 
+        '''
+        Convert calendar to png image
+        '''
+        FONT_SIZE = 30
+        SCALE = 1
+        PADDING = 30 * SCALE
+        COLUMN_GAP = 50 * SCALE
+        LINE_SPACING = 6 * SCALE
+        BG_COLOR = "white"
+        TEXT_COLOR = "black"
+
+        # Select font
+        try:
+            font = ImageFont.truetype("DejaVuSansMono.ttf", FONT_SIZE * SCALE)
+        except IOError:
+            font = ImageFont.load_default()
+
+        # Normalize tabs
+        lines = text.expandtabs(4).splitlines()
+
+        # Group lines into months
+        months = []
+        current = []
+        for line in lines:
+            if not line.strip():
+                continue
+            if not line.startswith(" "):  # new month
+                if current:
+                    months.append(current)
+                current = [line]
+            else:
+                current.append(line)
+        if current:
+            months.append(current)
+
+        # Measure text accurately
+        dummy = Image.new("RGB", (1, 1))
+        draw = ImageDraw.Draw(dummy)
+
+        month_widths = []
+        month_heights = []
+        month_line_heights = []
+
+        for month in months:
+            widths = []
+            heights = []
+            for line in month:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+                widths.append(w)
+                heights.append(h)
+
+            month_widths.append(max(widths))
+            total_height = sum(heights) + LINE_SPACING * (len(heights) - 1)
+            month_heights.append(total_height)
+            month_line_heights.append(heights)
+
+        # Create image
+        img_width = sum(month_widths) + COLUMN_GAP * (len(months) - 1) + PADDING * 2
+        img_height = max(month_heights) + PADDING * 2
+
+        img = Image.new("RGB", (img_width, img_height), BG_COLOR)
+        draw = ImageDraw.Draw(img)
+
+        # Render months from left to right
+        x = PADDING
+        for month, widths, heights in zip(months, month_widths, month_line_heights):
+            y = PADDING
+            for line, h in zip(month, heights):
+                draw.text((x, y), line, fill=TEXT_COLOR, font=font)
+                y += h + LINE_SPACING
+            x += widths + COLUMN_GAP
+
+        return img
 
 if __name__ == "__main__":
-    year_calendar().generate_calendar(2026)
-
-    # [Month, Daynumber, Date, ReducedDay, TotalDay]
+    year_calendar().calendar(2026)

@@ -27,6 +27,8 @@ class bbg_bids:
         self.new_folder = os.path.join(self.working_directory, "bbg_bidx", self.today)
         os.makedirs(self.new_folder, exist_ok=True)
 
+        self.sort_order = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22/4', '22', '33/6', '33']
+
     def run(self):
         self.extract()
         self.analyse()
@@ -58,12 +60,13 @@ class bbg_bids:
             driver.quit()
 
         logger.info(f"Starting: Cleaning Data")
-        # Clean data 
+
+        # Save original data 
         with open(os.path.join(self.new_folder, f'bbg_html_{self.today}.txt'), "r") as file:
             content = file.read()
 
         soup = BeautifulSoup(content, "html.parser")
-        
+
         rows = []
         for row in soup.select(".table-row"):
             cells = row.select(".table-cell")
@@ -132,21 +135,36 @@ class bbg_bids:
         logger.info("Analysing data")
         df = pd.read_csv(os.path.join(self.new_folder, 'bbg.csv'))
         df = df[~df["Birthday"].isna()]
+
         
         # Analyse day born
         logger.info("Analysing day born")
         df["Day"] = pd.to_datetime(df["Birthday"], format="%Y-%m-%d", errors="coerce").dt.day
         day_result = df["Day"].value_counts().sort_index()
-        # day_counts = day_counts.sort_values()
+        day_result = day_result.sort_values()
         day_result.to_csv(os.path.join(self.new_folder, f"day_{self.today}.csv"))
-        
+
         # Analyse lifepath
         logger.info("Analysing lifepath")
         utils = numerology()
-        # df["test"] = pd.to_datetime(df["Birthday"], format="%Y-%m-%d", errors="coerce")
-        df["lifepath"] = df["Birthday"].apply(utils.reduce_wrapper)
-        lp_result = df["lifepath"].value_counts().sort_index()
-        lp_result.to_csv(os.path.join(self.new_folder, f"lp_{self.today}.csv"))
+        df["Birthday"] = pd.to_datetime(df["Birthday"], format="%Y-%m-%d", errors="coerce")
+        df = df[~df["Birthday"].isna()]
+        lifepath_info = df["Birthday"].apply(utils.get_info)
+        df = df.join(pd.json_normalize(lifepath_info))
+
+        # Use column lp_day
+        lp_result = df["lp_day"].value_counts().reset_index()
+        lp_result['lp_day'] = pd.Categorical(lp_result['lp_day'], categories=self.sort_order, ordered=True)
+        lp_result = lp_result.sort_values(by='count')
+        lp_result.to_csv(os.path.join(self.new_folder, f"lp_{self.today}.csv"), index=False)
+
+        # Use column lp_day_full
+        lp_result = df["lp_day_full"].value_counts().sort_index().sort_values().reset_index()
+        lp_result.to_csv(os.path.join(self.new_folder, f"lp_full_{self.today}.csv"), index=False)
+
+        # Use column lp_day_reduced
+        lp_result = df["lp_day_reduced"].value_counts().sort_index().sort_values().reset_index()
+        lp_result.to_csv(os.path.join(self.new_folder, f"lp_reduced_{self.today}.csv"), index=False)
 
 if __name__ == '__main__':
     bbg_bids().run()

@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, date
+from typing import Dict
 
 class numerology: 
     def __init__(self): 
@@ -8,7 +9,7 @@ class numerology:
     def is_leap_year(self, year):
         return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
 
-    def getSum(self, n):
+    def get_sum(self, n):
         '''
         Add all the digits of a number
         '''
@@ -18,9 +19,20 @@ class numerology:
             n = n//10
         return sum
 
-    def reduce(self, n):
+    def get_sum_w(self, n):
+        '''
+        Wrapper for get_sum to not sum up master numbers
+        '''
+        if n in self.base_numbers: 
+            return n
+
+        return self.get_sum(n)
+
+    def reduce_final(self, n):
         '''
         Recursively add all the digits of a number until it reaches a base number. 
+        Only use this function if it is the final step of the reduction. 
+        Handles the case where 20 -> 11
         '''
         if n in self.base_numbers: 
             return n
@@ -28,63 +40,85 @@ class numerology:
         if n == 20: 
             return 11
 
-        if n == 28: 
+        return self.reduce_final(self.get_sum(n))
+
+    def reduce_number(self, n):
+        '''
+        Recursively add all the digits of a number until it reaches a base number. 
+        '''
+        if n in self.base_numbers: 
             return n
 
-        return self.reduce(self.getSum(n))
+        return self.reduce_number(self.get_sum(n))
 
-    def reduce_month(self, year, month):
-        reduce_month = month
-        year_sum = self.getSum(year)
+    def get_info(self, date: date) -> Dict[str, str]:
+        '''
+        Get all info for date
+        '''
 
-        # Version 1 (seperate digits month + year)
-        month_V1 = month
-        if month_V1 != 11:
-            month_V1 = self.getSum(month_V1)
+        # Day of year
+        day_of_year = date.timetuple().tm_yday
 
-        month_V1 = self.reduce(month_V1 + year_sum)
+        # Day
+        day = date.day
+        reduced_day = self.reduce_final(day)
 
-        # Version 2 (whole month + year)
-        month_V2 = self.reduce(month + year_sum)
+        # Month
+        month = date.month
+        reduced_month = self.reduce_final(month)
 
-        # Reduce month individually
-        reduce_month = self.reduce(month)
+        # Year
+        year = date.year
+        year_reduced = self.reduce_final(year)
 
-        return (reduce_month, month_V1, month_V2)
+        # LP Day
+        lp_day_full = self.get_sum_w(year) + month + day
+        lp_day_reduced = self.get_sum_w(year) + self.get_sum_w(month) + self.get_sum_w(day)
+        
+        lp_day_full_reduced = self.reduce_final(lp_day_full)
+        lp_day_reduced_reduced = self.reduce_final(lp_day_reduced)
 
-    def reduce_day(self, year, month, day):
-        reduce_day = day
-        year_sum = self.getSum(year)
+        lp_day_full_combined = str(lp_day_full) + "->" + str(lp_day_full_reduced)
+        lp_day_reduced_combined = str(lp_day_reduced) + "->" + str(lp_day_reduced_reduced)
 
-        # Version 1 (seperate digits day + month + year)
-        day_V1 = day
-        if day_V1 not in self.master_numbers:
-            # Reduce day individually
-            if day_V1 == 20 or day_V1 == 29:
-                reduce_day = 11
-            else:
-                reduce_day = self.reduce(day_V1)
-            day_V1 = self.getSum(day_V1)
+        if lp_day_full_reduced != lp_day_reduced_reduced: 
+            lp_day = f"{max(lp_day_full_reduced, lp_day_reduced_reduced)}/{min(lp_day_full_reduced, lp_day_reduced_reduced)}"
 
-        month_V1 = month
-        if month_V1 != 11:
-            month_V1 = self.getSum(month_V1)
+        else:
+            lp_day = str(lp_day_reduced_reduced)
 
-        day_V1 = self.reduce(day_V1 + month_V1 + year_sum)
+        # LP Month
+        lp_month_full = self.get_sum_w(year) + month
+        lp_month_reduced = self.get_sum_w(year) + self.get_sum_w(month)
+        lp_month_full_reduced = self.reduce_final(lp_month_full)
+        lp_month_reduced_reduced = self.reduce_final(lp_month_reduced)
 
-        # Version 2 (whole day + month + year)
-        day_V2 = self.reduce(day + month + year_sum)
+        lp_month_full_combined = str(lp_month_full) + "->" + str(lp_month_full_reduced)
+        lp_month_reduced_combined = str(lp_month_reduced) + "->" + str(lp_month_reduced_reduced)
 
-        return (reduce_day, day_V1, day_V2)
-    
-    def reduce_wrapper(self, date):
-        date = datetime.strptime(date, "%Y-%m-%d")
-        day, reduced_1, reduced_2 = self.reduce_day(date.year, date.month, date.day)
+        if lp_month_full_reduced != lp_month_reduced_reduced: 
+            lp_month = f"{max(lp_month_full_reduced, lp_month_reduced_reduced)}/{min(lp_month_full_reduced, lp_month_reduced_reduced)}"
 
-        return reduced_1
+        else:
+            lp_month = str(lp_month_reduced_reduced)
 
+        stats = {"date": date.strftime("%Y-%m-%d"), "day_of_year": day_of_year, 
+                 "day": day, "reduced_day": reduced_day, 
+                 "month": month, "reduced_month": reduced_month, 
+                 "year": year, "year_reduced": year_reduced, 
+
+                 "lp_day_full": lp_day_full, "lp_day_reduced": lp_day_reduced, 
+                 "lp_day_full_reduced": lp_day_full_reduced, "lp_day_reduced_reduced": lp_day_reduced_reduced, 
+                 "lp_day_full_combined": lp_day_full_combined, "lp_day_reduced_combined": lp_day_reduced_combined, 
+                 "lp_day": lp_day, 
+
+                 "lp_month_full": lp_month_full, "lp_month_reduced": lp_month_reduced, 
+                 "lp_month_full_reduced": lp_month_full_reduced, "lp_month_reduced_reduced": lp_month_reduced_reduced, 
+                 "lp_month_full_combined": lp_month_full_combined, "lp_month_reduced_combined": lp_month_reduced_combined, 
+                 "lp_month": lp_month, 
+                 }
+
+        return stats
 
 if __name__ == "__main__":
-    print(numerology().reduce_day(2025, 8, 15))
-    print(numerology().reduce_wrapper("1971-06-28"))
-    
+    print(numerology().get_info(date(2025, 11, 20)))
